@@ -14,7 +14,7 @@ from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfpage import PDFPage
 import os
-fileName = 'sample_math.pdf'
+fileName = 'sample_cs.pdf'
 listOfData = []
 
 
@@ -37,7 +37,7 @@ def get_text_coordinates(o: Any, depth=0) -> list:
     global listOfData
 
     v = get_optional_text(o)
-    if (len(v) > 1 and len(v) < 20):
+    if (len(v) > 1):
         listOfData.append([get_optional_text(o), get_optional_bbox(o)])
 
     if isinstance(o, Iterable):
@@ -91,7 +91,6 @@ def generate_data():
         pageData = get_text_coordinates(page)
         pagesData[i] = pageData
 
-
         # for d in pageData:
         #     if d[0] == '1.':
         #         print(d)
@@ -115,21 +114,7 @@ def find_questions():
             questionStr = str(questionNumCount) + "."
             questionStrOp2 = str(questionNumCount+1) + "."
             questionStrOp3 = str(questionNumCount+2) + "."
-            if (d[0] == questionStr):
-                questionDataBank[questionNumCount] = [
-                    questionNumCount, d[1], i]
-                if (questionNumCount > maxQuestionNum):
-                    maxQuestionNum = questionNumCount
-                questionNumCount += 1
-            elif (d[0] == questionStrOp2):
-                questionNumCount += 1
-                questionDataBank[questionNumCount] = [
-                    questionNumCount, d[1], i]
-                if (questionNumCount > maxQuestionNum):
-                    maxQuestionNum = questionNumCount
-                questionNumCount += 1
-            elif (d[0] == questionStrOp3):
-                questionNumCount += 2
+            if (d[0] == questionStr or d[0].strip()[0:len(str(questionNumCount))+1] == questionStr):
                 questionDataBank[questionNumCount] = [
                     questionNumCount, d[1], i]
                 if (questionNumCount > maxQuestionNum):
