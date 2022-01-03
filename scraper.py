@@ -14,7 +14,21 @@ from pdfminer.pdfparser import PDFParser
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfpage import PDFPage
 import os
-fileName = 'sample_cs.pdf'
+import yaml
+
+
+with open("config.yaml", 'r') as stream:
+    data_loaded = yaml.safe_load(stream)
+    print(data_loaded)
+
+fileName = data_loaded['filePath']
+firstPageToLoad = 2
+isMarkscheme = True if fileName[len(
+    fileName) - 14: len(fileName)] == 'markscheme.pdf' else False
+if (isMarkscheme):
+    print("Is MS")
+startPageNum = 2
+
 listOfData = []
 
 
@@ -22,7 +36,6 @@ listOfData = []
 doc = fitz.open(fileName)
 page = doc.load_page(2)
 ir = fitz.IRect(0, 0, 9999, 9999)
-# TODO problem is that the different papers have different max coordinates, so we need to scale the max coordinates based on a max picture dimensions.
 pix = page.get_pixmap(dpi=300, clip=ir)
 output = "sample" + ".png"
 pix.save(output)
@@ -52,8 +65,6 @@ def get_indented_name(o: Any, depth: int) -> str:
     # Indented name of LTItem
     return '  ' * depth + o.__class__.__name__
 
-# TODO find a way to export these values as a 2D array
-
 
 def get_optional_bbox(o: Any) -> str:
     # Coordinates of the text
@@ -72,9 +83,6 @@ def get_optional_text(o: Any) -> str:
     return ''
 
 
-# pageNum = 4
-# text = convert_pdf_to_txt(fileName, pageNum)
-# print(text)
 file = open(fileName, 'rb')
 parser = PDFParser(file)
 document = PDFDocument(parser)
@@ -84,37 +92,62 @@ pagesData = {}
 
 
 def generate_data():
-    for i in range(2, pdfLen + 1):
+    for i in range(firstPageToLoad, pdfLen + 1):
         global listOfData
         listOfData = []
         page = extract_pages(fileName, page_numbers=[i])
         pageData = get_text_coordinates(page)
         pagesData[i] = pageData
 
-        # for d in pageData:
-        #     if d[0] == '1.':
-        #         print(d)
+
 generate_data()
-# print(pagesData)
 
 questionDataBank = {
     # question number: question number, coordinates, page number
 }
 
-print(pagesData[3])
 
 maxQuestionNum = 0
+
+
+def find_start() -> bool:
+    global startPageNum
+    for i in range(firstPageToLoad, pdfLen + 1):
+        for d in pagesData[i]:
+            if ((d[0].strip()).upper() == 'SECTION A'):
+                startPageNum = i
+                print("Start page = " + str(i))
+                return True
+    print("Error: Could not find start")
+    return False
+
+
+find_start()
+
+
+def get_first_word(str: str) -> str:
+    firstCharPos = 0
+    for i in range(0, len(str)):
+        if (str[i] != ' '):
+            firstCharPos = i
+            break
+
+    lastCharPos = None
+    for i in range(firstCharPos, len(str)):
+        if (str[i] == ' '):
+            lastCharPos = i
+            break
+
+    return str[firstCharPos: lastCharPos]
 
 
 def find_questions():
     global maxQuestionNum
     questionNumCount = 1
-    for i in range(2, pdfLen + 1):
+    for i in range(startPageNum, pdfLen + 1):
         for d in pagesData[i]:
             questionStr = str(questionNumCount) + "."
-            questionStrOp2 = str(questionNumCount+1) + "."
-            questionStrOp3 = str(questionNumCount+2) + "."
-            if (d[0] == questionStr or d[0].strip()[0:len(str(questionNumCount))+1] == questionStr):
+            if (d[0] == questionStr or get_first_word(d[0]) == questionStr):
                 questionDataBank[questionNumCount] = [
                     questionNumCount, d[1], i]
                 if (questionNumCount > maxQuestionNum):
@@ -123,7 +156,7 @@ def find_questions():
 
 
 find_questions()
-print(questionDataBank)
+# print(questionDataBank)
 
 
 def pos_to_IRect(posarr) -> IRect:
@@ -140,7 +173,7 @@ def pos_to_IRect(posarr) -> IRect:
         temp = newy2
         newy2 = newy1
         newy1 = temp
-    print(newx1, newy1, newx2, newy2)
+    #print(newx1, newy1, newx2, newy2)
     return fitz.IRect(newx1, newy1, newx2, newy2)
 
 
@@ -156,21 +189,26 @@ def generate_images():
             if (i+1 <= maxQuestionNum and i+1 in questionDataBank):
                 nextq = None
                 nextq = questionDataBank[i+1]
-                page = doc.load_page(q[2])
-                # Width of page = 643, height of page = 890 units
-                c = q[1]
-                y1 = 100
-                if (nextq != None and q[2] == nextq[2]):
-                    y1 = nextq[1][3] + 10
+                for i in range(q[2], nextq[2] + 1):
+                    if (nextq[2] == i and i != q[2]):
+                        break
+                    if (nextq[2] == i):
+                        y1 = nextq[1][3] + 10
+                    else:
+                        y1 = 20
+                    page = doc.load_page(i)
+                    coordinates = q[1]
+                    if (i == q[2]):
+                        y2 = coordinates[3]
+                    else:
+                        y2 = maxHeightUnits
+                    ir = pos_to_IRect([0, y1, 9999, y2+20])
+                    pix = page.get_pixmap(dpi=300, clip=ir)
+                    output = "question"+str(q[0]) + "_p" + str(i + 1) + ".png"
+                    pix.save(output)
 
-                y2 = c[3]
-
-                ir = pos_to_IRect([0, y1, 590, y2+20])
-
-                pix = page.get_pixmap(dpi=300, clip=ir)
-                output = "question"+str(q[0]) + ".png"
-                pix.save(output)
             else:
+                # TODO, add support for multi-page questions for last question
                 page = doc.load_page(q[2])
                 # Width of page = 643, height of page = 890 units
                 c = q[1]

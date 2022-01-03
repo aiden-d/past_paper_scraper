@@ -1,2 +1,3 @@
-str = "abcdefg"
-print(str[0:2])
+
+for i in range(0, 1):
+    print(i)
